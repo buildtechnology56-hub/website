@@ -1,12 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react';
 import {
   ArrowUpRight,
+  Check,
   CheckCircle2,
+  Copy,
   Globe,
   Instagram,
-  Loader2,
   Mail,
   MapPin,
+  MessageCircle,
   Phone,
   Send,
 } from 'lucide-react';
@@ -15,6 +17,15 @@ import { SiteContent } from '../types/agency';
 interface ContactSectionProps {
   siteContent: SiteContent;
   preselectedService: string;
+}
+
+interface PreparedInquiry {
+  summaryText: string;
+  mailtoUrl: string;
+  whatsappPrimaryUrl: string;
+  whatsappSecondaryUrl: string;
+  whatsappPrimaryLabel: string;
+  whatsappSecondaryLabel: string;
 }
 
 const SERVICE_OPTIONS = [
@@ -49,7 +60,12 @@ const BUDGET_OPTIONS_BY_CURRENCY = {
   ],
 } as const;
 
-function parseContactPhoneEntry(entry: string): { dialHref: string; numberPart: string; namePart: string } {
+function parseContactPhoneEntry(entry: string): {
+  dialHref: string;
+  waDigits: string;
+  numberPart: string;
+  namePart: string;
+} {
   const trimmed = entry.trim();
   const match = trimmed.match(/^(\+?\d[\d\s\-()]{5,}\d)(?:\s+(.*))?$/);
   if (match) {
@@ -57,12 +73,14 @@ function parseContactPhoneEntry(entry: string): { dialHref: string; numberPart: 
     const namePart = (match[2] || '').trim();
     return {
       dialHref: `tel:${numberPart.replace(/[^\d+]/g, '')}`,
+      waDigits: numberPart.replace(/\D/g, ''),
       numberPart,
       namePart,
     };
   }
   return {
     dialHref: `tel:${trimmed.replace(/[^\d+]/g, '')}`,
+    waDigits: trimmed.replace(/\D/g, ''),
     numberPart: trimmed,
     namePart: '',
   };
@@ -78,9 +96,9 @@ export function ContactSection({ siteContent, preselectedService }: ContactSecti
   const [projectBudget, setProjectBudget] = useState<string>(BUDGET_OPTIONS_BY_CURRENCY.USD[2]);
   const [projectDetails, setProjectDetails] = useState('');
 
-  const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [preparedInquiry, setPreparedInquiry] = useState<PreparedInquiry | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (preselectedService) {
@@ -88,18 +106,25 @@ export function ContactSection({ siteContent, preselectedService }: ContactSecti
     }
   }, [preselectedService]);
 
+  const phoneEntries = (siteContent.phoneNumber || '')
+    .split(/[,|\n·]+/)
+    .map((n) => n.trim())
+    .filter(Boolean)
+    .map(parseContactPhoneEntry);
+
   const handleCurrencyChange = (currency: 'USD' | 'PKR') => {
     setBudgetCurrency(currency);
     setProjectBudget(BUDGET_OPTIONS_BY_CURRENCY[currency][1]);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    setSuccessMsg('');
+    setCopied(false);
 
     const trimmedName = fullName.trim();
     const trimmedEmail = businessEmail.trim();
+    const trimmedCompany = companyName.trim();
     const trimmedCountry = country.trim();
     const trimmedDetails = projectDetails.trim();
 
@@ -120,47 +145,59 @@ export function ContactSection({ siteContent, preselectedService }: ContactSecti
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/inquiries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: trimmedName,
-          businessEmail: trimmedEmail,
-          companyName: companyName.trim(),
-          country: trimmedCountry,
-          serviceRequired,
-          projectBudget,
-          projectDetails: trimmedDetails,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Could not submit inquiry. Please verify your inputs.');
-        return;
-      }
+    const summaryLines = [
+      'New Project Inquiry — Build Technology',
+      '----------------------------------------',
+      `Full Name: ${trimmedName}`,
+      `Business Email: ${trimmedEmail}`,
+      `Company: ${trimmedCompany || 'Not specified'}`,
+      `Country / Region: ${trimmedCountry}`,
+      `Service Required: ${serviceRequired}`,
+      `Estimated Budget (${budgetCurrency}): ${projectBudget}`,
+      '',
+      'Project Details:',
+      trimmedDetails,
+    ];
+    const summaryText = summaryLines.join('\n');
+    const subject = `Project Inquiry: ${serviceRequired} — ${trimmedName}`;
 
-      setSuccessMsg(
-        data.message || 'Thank you. Your inquiry has been received and our team will reach out shortly.',
-      );
-      setFullName('');
-      setBusinessEmail('');
-      setCompanyName('');
-      setCountry('');
-      setProjectDetails('');
+    const primaryPhone = phoneEntries[0];
+    const secondaryPhone = phoneEntries[1];
+
+    const primaryDigits = primaryPhone?.waDigits || '923322846238';
+    const secondaryDigits = secondaryPhone?.waDigits || '923112713755';
+
+    setPreparedInquiry({
+      summaryText,
+      mailtoUrl: `mailto:${siteContent.contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(summaryText)}`,
+      whatsappPrimaryUrl: `https://wa.me/${primaryDigits}?text=${encodeURIComponent(summaryText)}`,
+      whatsappSecondaryUrl: `https://wa.me/${secondaryDigits}?text=${encodeURIComponent(summaryText)}`,
+      whatsappPrimaryLabel: primaryPhone?.numberPart || '+92 3322846238',
+      whatsappSecondaryLabel: secondaryPhone?.numberPart || '+92 3112713755',
+    });
+  };
+
+  const handleCopySummary = async () => {
+    if (!preparedInquiry) return;
+    try {
+      await navigator.clipboard.writeText(preparedInquiry.summaryText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
     } catch {
-      setErrorMsg('Network error while sending your inquiry. Please try again.');
-    } finally {
-      setSubmitting(false);
+      setCopied(false);
     }
   };
 
-  const phoneEntries = (siteContent.phoneNumber || '')
-    .split(/[,|\n·]+/)
-    .map((n) => n.trim())
-    .filter(Boolean)
-    .map(parseContactPhoneEntry);
+  const handleResetNewInquiry = () => {
+    setPreparedInquiry(null);
+    setFullName('');
+    setBusinessEmail('');
+    setCompanyName('');
+    setCountry('');
+    setProjectDetails('');
+    setErrorMsg('');
+    setCopied(false);
+  };
 
   return (
     <section id="contact" className="bg-white py-20 font-['Times_New_Roman',Times,serif] italic lg:py-28">
@@ -267,24 +304,85 @@ export function ContactSection({ siteContent, preselectedService }: ContactSecti
           {/* Right Column: Validated Inquiry Form */}
           <div className="lg:col-span-7">
             <div className="rounded-2xl border border-[#E2DCFA] bg-[#FAF9FF] p-6 font-[Georgia] font-normal shadow-sm sm:p-8">
-              {successMsg ? (
-                <div className="py-10 text-center">
+              {preparedInquiry ? (
+                <div className="py-4">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#EDE9FE] text-[#5B42F3]">
                     <CheckCircle2 className="h-6 w-6" />
                   </div>
-                  <h3 className="mt-4 font-display text-xl font-bold text-[#131129]">
-                    Project Inquiry Submitted
+                  <h3 className="mt-4 text-center font-display text-xl font-bold text-[#131129]">
+                    Inquiry Prepared — Choose How to Send
                   </h3>
-                  <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#56536E]">
-                    {successMsg}
+                  <p className="mx-auto mt-2 max-w-lg text-center text-sm leading-relaxed text-[#56536E]">
+                    Send your pre-filled project details directly to the Build Technology team via WhatsApp or email below.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setSuccessMsg('')}
-                    className="mt-6 inline-flex min-h-[40px] items-center justify-center rounded-full border border-[#D4CBFA] bg-white px-5 py-2 text-sm font-semibold text-[#5B42F3] transition-colors hover:bg-[#F4F0FF] cursor-pointer"
-                  >
-                    Submit Another Inquiry
-                  </button>
+
+                  <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <a
+                      href={preparedInquiry.whatsappPrimaryUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[#5B42F3] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#4932D0]"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      <span>Send via WhatsApp</span>
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </a>
+
+                    <a
+                      href={preparedInquiry.mailtoUrl}
+                      className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full border border-[#5B42F3] bg-white px-5 py-2.5 text-sm font-semibold text-[#5B42F3] transition-colors hover:bg-[#F4F0FF]"
+                    >
+                      <Mail className="h-4 w-4" />
+                      <span>Send via Email App</span>
+                    </a>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-[#E7E2FA] bg-white p-4">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-[#706C8A]">Prepared Inquiry Summary</span>
+                      <button
+                        type="button"
+                        onClick={handleCopySummary}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[#E7E2FA] bg-[#FAF9FF] px-2.5 py-1 text-xs font-semibold text-[#5B42F3] transition-colors hover:bg-[#EDE9FE] cursor-pointer"
+                      >
+                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                        <span>{copied ? 'Copied' : 'Copy Text'}</span>
+                      </button>
+                    </div>
+                    <pre className="whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-[#3C3954]">
+                      {preparedInquiry.summaryText}
+                    </pre>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#ECE8FA] pt-4">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-[#56536E]">
+                      <span>Alternate WhatsApp:</span>
+                      <a
+                        href={preparedInquiry.whatsappSecondaryUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono-tabular font-semibold text-[#5B42F3] hover:underline"
+                      >
+                        {preparedInquiry.whatsappSecondaryLabel}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPreparedInquiry(null)}
+                        className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-[#D4CBFA] bg-white px-4 py-1.5 text-xs font-semibold text-[#56536E] transition-colors hover:bg-[#F4F0FF] cursor-pointer"
+                      >
+                        Edit Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetNewInquiry}
+                        className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-[#D4CBFA] bg-white px-4 py-1.5 text-xs font-semibold text-[#5B42F3] transition-colors hover:bg-[#F4F0FF] cursor-pointer"
+                      >
+                        New Inquiry
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -430,21 +528,14 @@ export function ContactSection({ siteContent, preselectedService }: ContactSecti
 
                   <button
                     type="submit"
-                    disabled={submitting}
-                    className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-[#493f81] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-150 hover:bg-[#3d346e] disabled:opacity-60 cursor-pointer"
+                    className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-[#493f81] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-150 hover:bg-[#3d346e] cursor-pointer"
                   >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Sending Project Inquiry...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        Send Project Inquiry
-                      </>
-                    )}
+                    <Send className="h-4 w-4" />
+                    Send Project Inquiry
                   </button>
+                  <p className="text-center text-xs text-[#706C8A]">
+                    Prepares a direct WhatsApp or email message to {siteContent.contactEmail}.
+                  </p>
                 </form>
               )}
             </div>

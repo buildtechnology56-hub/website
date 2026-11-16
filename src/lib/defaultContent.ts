@@ -161,7 +161,7 @@ export const DEFAULT_PUBLIC_CONTENT: Omit<AgencyDatabase, 'inquiries'> = {
       shortDescription:
         'Demo storefront concept featuring regional currency localization, fast filterable product discovery, and streamlined checkout architecture.',
       fullSummary:
-        'A conceptual demonstration of an international retail web platform engineered for rapid page transitions, multi-region currency handling, and clean editorial product merchandising.',
+        'A conceptual demonstration of an international retail web platform engineered for rapid page transitions, multi-region currency handling, and clean editorial product merchandising. Created as an illustrative demo showcasing Build Technology e-commerce engineering standards.',
       technologies: ['Next.js', 'React', 'Node.js', 'Shopify', 'CSS3'],
       imageUrl: 'demo:commerce',
       projectUrl: '#contact',

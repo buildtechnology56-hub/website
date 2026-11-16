@@ -67,7 +67,7 @@ export function Header({ onNavigateAdmin, isAdminView, onExitAdmin }: HeaderProp
             className="flex items-center whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#5B42F3]"
           >
             <img
-              src="/assets/aistudio/Build_Technology_Blue_Corporate_Logo_7d6f52b3.png"
+              src={`${import.meta.env.BASE_URL}assets/aistudio/Build_Technology_Blue_Corporate_Logo_7d6f52b3.png`}
               alt="Build Technology"
               referrerPolicy="no-referrer"
               className="h-12 w-auto object-contain sm:h-13"

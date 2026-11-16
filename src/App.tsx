@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
@@ -182,7 +182,7 @@ function renderHighlightedHeadline(headline: string) {
 }
 
 export default function App() {
-  const [content, setContent] = useState<Omit<AgencyDatabase, 'inquiries'>>(DEFAULT_PUBLIC_CONTENT);
+  const [content] = useState<Omit<AgencyDatabase, 'inquiries'>>(DEFAULT_PUBLIC_CONTENT);
   const [isAdminView, setIsAdminView] = useState<boolean>(() => window.location.hash === '#admin');
 
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
@@ -195,28 +195,9 @@ export default function App() {
   const [preselectedService, setPreselectedService] = useState<string>('Web Development');
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
-  const loadPublicContent = useCallback(async () => {
-    try {
-      const res = await fetch('/api/content');
-      if (!res.ok) return;
-      const data = (await res.json()) as Omit<AgencyDatabase, 'inquiries'>;
-      if (data && data.siteContent) {
-        setContent(data);
-      }
-    } catch {
-      // Retain default fallback content if API is momentarily unavailable
-    }
-  }, []);
-
-  useEffect(() => {
-    loadPublicContent();
-  }, [loadPublicContent]);
-
   useEffect(() => {
     const onHashChange = () => {
-      if (window.location.hash === '#admin') {
-        setIsAdminView(true);
-      }
+      setIsAdminView(window.location.hash === '#admin');
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -264,7 +245,7 @@ export default function App() {
       <Header onNavigateAdmin={openAdmin} isAdminView={isAdminView} onExitAdmin={exitAdmin} />
 
       {isAdminView ? (
-        <AdminDashboard onContentUpdated={loadPublicContent} />
+        <AdminDashboard onExitAdmin={exitAdmin} />
       ) : (
         <main>
           {/* 1. HERO SECTION */}

@@ -33,7 +33,7 @@ export function Footer({ siteContent, services, onOpenAdmin }: FooterProps) {
               className="inline-flex items-center rounded-xl bg-white px-3.5 py-2 shadow-sm"
             >
               <img
-                src="/assets/aistudio/Build_Technology_Blue_Corporate_Logo_7d6f52b3.png"
+                src={`${import.meta.env.BASE_URL}assets/aistudio/Build_Technology_Blue_Corporate_Logo_7d6f52b3.png`}
                 alt="Build Technology"
                 referrerPolicy="no-referrer"
                 className="h-11 w-auto object-contain"
